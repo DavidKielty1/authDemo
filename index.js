@@ -47,11 +47,7 @@ app.get("/register", (req, res) => {
 
 app.post("/register", async (req, res) => {
   const { password, username } = req.body;
-  const hash = await bcrypt.hash(password, 12);
-  const user = new User({
-    username,
-    password: hash,
-  });
+  const user = new User({ username, password });
   await user.save();
   req.session.user_id = user._id;
   res.redirect("/login");
@@ -63,10 +59,9 @@ app.get("/login", (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { password, username } = req.body;
-  const user = await User.findOne({ username });
-  const authPass = await bcrypt.compare(password, user.password);
-  if (authPass) {
-    req.session.user_id = user._id;
+  const foundUser = await User.findAndValidate(username, password);
+  if (foundUser) {
+    req.session.user_id = foundUser._id;
     res.redirect("/secret");
   } else {
     res.redirect("/login");
@@ -83,8 +78,8 @@ app.get("/secret", requireLogin, (req, res) => {
 });
 
 app.get("/topsecret", requireLogin, (req, res) => {
-    res.send("secret");
-  });
+  res.send("secret");
+});
 
 app.listen(3000, () => {
   console.log("App is being serving on port 3000.");
