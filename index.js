@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const User = require("./models/user");
 const ejsMate = require("ejs-mate");
 const bcrypt = require("bcrypt");
+const session = require("express-session");
 
 mongoose
   .connect("mongodb://localhost:27017/authDemo", {
@@ -25,6 +26,16 @@ app.set("views", "views");
 app.engine("ejs", ejsMate);
 
 app.use(express.urlencoded({ extended: true }));
+app.use(
+  session({ secret: "notagoodsecret", resave: false, saveUninitialized: false })
+);
+
+const requireLogin = (req, res, next) => {
+  if (!req.session.user_id) {
+    return res.redirect("/login");
+  }
+  next();
+};
 
 app.get("/", (req, res) => {
   res.send("This is the home page");
@@ -42,6 +53,7 @@ app.post("/register", async (req, res) => {
     password: hash,
   });
   await user.save();
+  req.session.user_id = user._id;
   res.redirect("/login");
 });
 
@@ -54,15 +66,25 @@ app.post("/login", async (req, res) => {
   const user = await User.findOne({ username });
   const authPass = await bcrypt.compare(password, user.password);
   if (authPass) {
-    res.send("yaaay welcome");
+    req.session.user_id = user._id;
+    res.redirect("/secret");
   } else {
-    res.send("try again");
+    res.redirect("/login");
   }
 });
 
-app.get("/secret", (req, res) => {
-  res.send("THIS IS SECRET! YOU CANNOT SEE ME UNLESS YOU ARE LOGGED IN");
+app.post("/logout", (req, res) => {
+  req.session.user_id = null;
+  res.redirect("login");
 });
+
+app.get("/secret", requireLogin, (req, res) => {
+  res.render("secret");
+});
+
+app.get("/topsecret", requireLogin, (req, res) => {
+    res.send("secret");
+  });
 
 app.listen(3000, () => {
   console.log("App is being serving on port 3000.");
